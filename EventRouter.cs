@@ -321,19 +321,16 @@ public class EventRouter {
 	/// An arbitrary params array of objects to be interpreted by the receiver of the event.
 	/// </param>
 	public static void Publish(string id, string evt, object sender, params object[] data) {
-		if (id != "") {
-			// republish event so handlers that don't care about id's get processed as well
-			Publish("", evt, sender, data);
-		}
 		Dictionary<string, Handler> handlersForType;
 		if (handlers.TryGetValue(evt, out handlersForType)) {
 			Handler handler;
-			if (handlersForType.TryGetValue(id, out handler)) {
-				var e = new Event { Type = evt, Id = id, Sender = sender };
-	
-				if (data != null && data.Length > 0) e.Data = data;
-				
-				handler(e);
+			
+			// send event to handlers that match the specified id as well as those that don't care about id's
+			if(id != "" && handlersForType.TryGetValue(id, out handler)) {
+				CallHandler(id, evt, sender, data, handler);
+			}
+			if(handlersForType.TryGetValue("", out handler)) {
+				CallHandler(id, evt, sender, data, handler);
 			}
 		}
 	}
@@ -361,8 +358,13 @@ public class EventRouter {
 		handlers.Clear();
 	}
 	
-	static string EnumValueToString(Enum value) {
+	public static string EnumValueToString(Enum value) {
 		return string.Format("{0}.{1}", value.GetType(), value);
 	}
 	
+	static void CallHandler(string id, string type, object sender, object[] data, Handler handler) {
+		var e = new Event { Type = type, Id = id, Sender = sender };
+		if (data != null && data.Length > 0) e.Data = data;
+		handler(e);
+	}
 }
