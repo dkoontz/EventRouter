@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2011 David Koontz, Dan Peschman, and Logan Barnett
+// Copyright (c) 2009-2012 David Koontz, Dan Peschman, and Logan Barnett
 // Please direct any bugs/comments/suggestions to david@koontzfamily.org
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,9 +19,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 /// <summary>
@@ -119,11 +120,10 @@ public class EventRouter {
 	public class Event {
 		public string Type;
 		public string Id;
-		public object Sender;
 		public object[] Data;
 		
 		public bool HasData {
-			get { return Data != null && Data.Length > 0;}
+			get { return Data != null && Data.Length > 0; }
 		}
 		
 		public T GetData<T>(int index) {
@@ -133,9 +133,11 @@ public class EventRouter {
 	
 	public delegate void Handler(Event e);
 	
-	private static Dictionary<string, Dictionary<string, Handler>> handlers = new Dictionary<string, Dictionary<string, Handler>>();
+	public static bool LogEvents = false;
 	
-	
+	static Dictionary<string, Dictionary<string, Handler>> handlers = new Dictionary<string, Dictionary<string, Handler>>();
+	static Queue<Event> queuedEvents = new Queue<Event>();
+
 	/// <summary>
 	/// Subscribe to the event specified by evt.  Pass in a delegate to be called back when the even occurs.
 	/// </summary>
@@ -148,7 +150,6 @@ public class EventRouter {
 	public static void Subscribe(Enum evt, Handler h) {
 		Subscribe("", EnumValueToString(evt), h);
 	}
-	
 	
 	/// <summary>
 	/// Subscribe to the event specified by evt filtered by the specified id.  Pass in a delegate to be called back when the even occurs.
@@ -166,7 +167,6 @@ public class EventRouter {
 		Subscribe(id, EnumValueToString(evt), h);
 	}
 	
-	
 	/// <summary>
 	/// Subscribe to the event specified by evt.  Pass in a delegate to be called back when the even occurs.
 	/// </summary>
@@ -180,11 +180,11 @@ public class EventRouter {
 	/// The delegate to be called when the even occurs.
 	/// </param>
 	public static void Subscribe(string id, string evt, Handler h) {
-		if (!handlers.ContainsKey(evt)) {
+		if(!handlers.ContainsKey(evt)) {
 			handlers.Add(evt, new Dictionary<string, Handler>());
 		}
 		
-		if (!handlers[evt].ContainsKey(id)) {
+		if(!handlers[evt].ContainsKey(id)) {
 			handlers[evt].Add(id, null);
 		}
 		
@@ -259,50 +259,10 @@ public class EventRouter {
 	/// The delegate to be removed from the event handlers.
 	/// </param>
 	public static void Unsubscribe(string id, string evt, Handler h) {
-		if (handlers.ContainsKey(evt)) {
-			if (handlers[evt].ContainsKey(id)) {
-				handlers[evt][id] -= h;
-				
-				if (handlers[evt][id] == null) {
-					handlers.Remove(evt);
-				}
-			}
+		if(handlers.ContainsKey(evt) && handlers[evt].ContainsKey(id)) {
+			handlers[evt][id] -= h;
+			if(handlers[evt][id] == null) handlers.Remove(evt);
 		}
-	}
-	
-	/// <summary>
-	/// Publish the specified event with extra data.
-	/// </summary>
-	/// <param name='id'>
-	/// The string representing the object.
-	/// </para>
-	/// <param name='evt'>
-	/// The event enumeration value.
-	/// </param>
-	/// <param name='sender'>
-	/// The event's sender, usually 'this'.
-	/// </param>
-	/// <param name='data'>
-	/// An arbitrary params array of objects to be interpreted by the receiver of the event.
-	/// </param>
-	public static void Publish(string id, Enum evt, object sender, params object[] data) {
-		Publish(id, EnumValueToString(evt), sender, data);
-	}
-	
-	/// <summary>
-	/// Publish the specified event with extra data.
-	/// </summary>
-	/// <param name='evt'>
-	/// The event enumeration value.
-	/// </param>
-	/// <param name='sender'>
-	/// The event's sender, usually 'this'.
-	/// </param>
-	/// <param name='data'>
-	/// An arbitrary params array of objects to be interpreted by the receiver of the event.
-	/// </param>
-	public static void Publish(Enum evt, object sender, params object[] data) {
-		Publish(EnumValueToString(evt), sender, data);
 	}
 	
 	/// <summary>
@@ -314,24 +274,17 @@ public class EventRouter {
 	/// <param name='evt'>
 	/// The string representing the event.
 	/// </param>
-	/// <param name='sender'>
-	/// The event's sender, usually 'this'.
-	/// </param>
 	/// <param name='data'>
 	/// An arbitrary params array of objects to be interpreted by the receiver of the event.
 	/// </param>
-	public static void Publish(string id, string evt, object sender, params object[] data) {
-		Dictionary<string, Handler> handlersForType;
-		if (handlers.TryGetValue(evt, out handlersForType)) {
-			Handler handler;
-			
-			// send event to handlers that match the specified id as well as those that don't care about id's
-			if(id != "" && handlersForType.TryGetValue(id, out handler)) {
-				CallHandler(id, evt, sender, data, handler);
-			}
-			if(handlersForType.TryGetValue("", out handler)) {
-				CallHandler(id, evt, sender, data, handler);
-			}
+	public static void Publish(string id, string evt, params object[] data) {
+		if(LogEvents) Debug.Log(string.Format("Event Published: '{0}' with id: '{1}' and {2} parameters", evt, id, data.Length));
+		
+		ProcessEvent(id, evt, data);
+		
+		while(queuedEvents.Count > 0) {
+			var queuedEvent = queuedEvents.Dequeue();
+			ProcessEvent(queuedEvent.Id, queuedEvent.Type, queuedEvent.Data);
 		}
 	}
 	
@@ -347,8 +300,61 @@ public class EventRouter {
 	/// <param name='data'>
 	/// An arbitrary params array of objects to be interpreted by the receiver of the event.
 	/// </param>
-	public static void Publish(string evt, object sender, params object[] data) {
-		Publish("", evt, sender, data);
+	public static void Publish(string evt, params object[] data) {
+		Publish("", evt, data);
+	}
+
+	/// <summary>
+	/// Publish the specified event with extra data.
+	/// </summary>
+	/// <param name='id'>
+	/// The string representing the object.
+	/// </para>
+	/// <param name='evt'>
+	/// The event enumeration value.
+	/// </param>
+	/// <param name='sender'>
+	/// The event's sender, usually 'this'.
+	/// </param>
+	/// <param name='data'>
+	/// An arbitrary params array of objects to be interpreted by the receiver of the event.
+	/// </param>
+	public static void Publish(string id, Enum evt, params object[] data) {
+		Publish(id, EnumValueToString(evt), data);
+	}
+	
+	/// <summary>
+	/// Publish the specified event with extra data.
+	/// </summary>
+	/// <param name='evt'>
+	/// The event enumeration value.
+	/// </param>
+	/// <param name='sender'>
+	/// The event's sender, usually 'this'.
+	/// </param>
+	/// <param name='data'>
+	/// An arbitrary params array of objects to be interpreted by the receiver of the event.
+	/// </param>
+	public static void Publish(Enum evt, params object[] data) {
+		Publish(EnumValueToString(evt), data);
+	}
+	
+	public static void Queue(string id, string evt, params object[] data) {
+		var e = new Event { Type = evt, Id = id };
+		if (data != null && data.Length > 0) e.Data = data;
+		queuedEvents.Enqueue(e);
+	}
+	
+	public static void Queue(string evt, params object[] data) {
+		Queue(string.Empty, evt, data);
+	}
+	
+	public static void Queue(string id, Enum evt, params object[] data) {
+		Queue(id, EnumValueToString(evt), data);
+	}
+	
+	public static void Queue(Enum evt, params object[] data) {
+		Queue(string.Empty, EnumValueToString(evt), data);
 	}
 	
 	/// <summary>
@@ -358,13 +364,22 @@ public class EventRouter {
 		handlers.Clear();
 	}
 	
-	public static string EnumValueToString(Enum value) {
-		return string.Format("{0}.{1}", value.GetType(), value);
+	static void ProcessEvent(string id, string evt, params object[] data) {
+		Dictionary<string, Handler> handlersForType;
+		if(handlers.TryGetValue(evt, out handlersForType)) {
+			Handler handler;
+			if(handlersForType.TryGetValue(id, out handler)) {
+				var e = new Event { Type = evt, Id = id };
+				if (data != null && data.Length > 0) e.Data = data;
+				handler(e);
+			}
+		}
+		
+		// invoke handlers that don't care about a particular id
+		if(!string.IsNullOrEmpty(id)) ProcessEvent(string.Empty, evt, data);
 	}
 	
-	static void CallHandler(string id, string type, object sender, object[] data, Handler handler) {
-		var e = new Event { Type = type, Id = id, Sender = sender };
-		if (data != null && data.Length > 0) e.Data = data;
-		handler(e);
+	static string EnumValueToString(Enum value) {
+		return string.Format("{0}.{1}", value.GetType(), value);
 	}
 }
