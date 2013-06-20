@@ -373,10 +373,14 @@ public class EventRouter {
 				if (data != null && data.Length > 0) e.Data = data;
 				handler(e);
 			}
+
+			// invoke handlers that don't care about a particular id
+			if(id != string.Empty && handlersForType.TryGetValue(string.Empty, out handler)) {
+				var e = new Event { Type = evt, Id = id };
+				if (data != null && data.Length > 0) e.Data = data;
+				handler(e);
+			}
 		}
-		
-		// invoke handlers that don't care about a particular id
-		if(!string.IsNullOrEmpty(id)) ProcessEvent(string.Empty, evt, data);
 	}
 	
 	static string EnumValueToString(Enum value) {
