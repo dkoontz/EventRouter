@@ -48,7 +48,7 @@ using UnityEngine;
 ///		
 ///		public class Sender {
 ///			public void Send() {
-///				EventRouter.Publish(SenderEvent.Test, this, "Hello World");
+///				EventRouter.Publish(SenderEvent.Test, "Hello World");
 ///			}
 ///		}
 /// 	</code>
@@ -63,10 +63,10 @@ using UnityEngine;
 ///			
 ///			void OnSenderEvent(EventRouter.Event evt) {
 ///				if(evt.HasData) {
-///					Console.WriteLine("Received event: " + evt.Type + " from: " + evt.Sender.ToString() + " with data: " + evt.Data[0]);
+///					Console.WriteLine("Received event: " + evt.Type + " with data: " + evt.GetData<string>(0));
 ///				}
 ///				else {
-///					Console.WriteLine("Received event: " + evt.Type + " from: " + evt.Sender.ToString() + " with no data");
+///					Console.WriteLine("Received event: " + evt.Type + " with no data");
 ///				}
 ///			}
 ///		}
@@ -85,11 +85,11 @@ using UnityEngine;
 ///		
 ///		public class Sender {
 ///			public void SendA() {
-///				EventRouter.Publish("A", SenderEvent.Test, this, "Hello World");
+///				EventRouter.Publish("A", SenderEvent.Test);
 ///			}
 ///			
 ///			public void SendB() {
-///				EventRouter.Publish("B", SenderEvent.Test, this, "Hello World");
+///				EventRouter.Publish("B", SenderEvent.Test);
 ///			}
 ///		}
 /// 	</code>
@@ -104,11 +104,11 @@ using UnityEngine;
 ///			}
 ///			
 ///			void OnSenderEventA(EventRouter.Event evt) {
-///				Console.WriteLine("Received A event);
+///				Console.WriteLine("Received SenderEvent.Test with id 'A'");
 ///			}
 ///
 ///			void OnSenderEventB(EventRouter.Event evt) {
-///				Console.WriteLine("Received B event);
+///				Console.WriteLine("Received SenderEvent.Test with id 'B'");
 ///			}
 ///		}
 /// 	</code>
@@ -294,9 +294,6 @@ public class EventRouter {
 	/// <param name='evt'>
 	/// The string representing the event.
 	/// </param>
-	/// <param name='sender'>
-	/// The event's sender, usually 'this'.
-	/// </param>
 	/// <param name='data'>
 	/// An arbitrary params array of objects to be interpreted by the receiver of the event.
 	/// </param>
@@ -313,9 +310,6 @@ public class EventRouter {
 	/// <param name='evt'>
 	/// The event enumeration value.
 	/// </param>
-	/// <param name='sender'>
-	/// The event's sender, usually 'this'.
-	/// </param>
 	/// <param name='data'>
 	/// An arbitrary params array of objects to be interpreted by the receiver of the event.
 	/// </param>
@@ -328,9 +322,6 @@ public class EventRouter {
 	/// </summary>
 	/// <param name='evt'>
 	/// The event enumeration value.
-	/// </param>
-	/// <param name='sender'>
-	/// The event's sender, usually 'this'.
 	/// </param>
 	/// <param name='data'>
 	/// An arbitrary params array of objects to be interpreted by the receiver of the event.

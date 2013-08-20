@@ -13,7 +13,7 @@ public enum SenderEvent {
 
 public class Sender {
 	public void Send() {
-		EventRouter.Publish(SenderEvent.Test, this, "Hello World");
+		EventRouter.Publish(SenderEvent.Test, "Hello World");
 	}
 }
 ```
@@ -27,10 +27,10 @@ public class Receiver {
 
 	void OnSenderEvent(EventRouter.Event evt) {
 		if(evt.HasData) {
-			Console.WriteLine("Received event: " + evt.Type + " from: " + evt.Sender.ToString() + " with data: " + evt.Data[0]);
+			Console.WriteLine("Received event: " + evt.Type + " with data: " + evt.GetData<string>(0));
 		}
 		else {
-			Console.WriteLine("Received event: " + evt.Type + " from: " + evt.Sender.ToString() + " with no data");
+			Console.WriteLine("Received event: " + evt.Type + " with no data");
 		}
 	}
 }
@@ -47,11 +47,11 @@ public enum SenderEvent {
 
 public class Sender {
 	public void SendA() {
-		EventRouter.Publish("A", SenderEvent.Test, this, "Hello World");
+		EventRouter.Publish("A", SenderEvent.Test);
 	}
 	
 	public void SendB() {
-		EventRouter.Publish("B", SenderEvent.Test, this, "Hello World");
+		EventRouter.Publish("B", SenderEvent.Test);
 	}
 }
 ```
@@ -65,11 +65,11 @@ public class Receiver {
 	}
 	
 	void OnSenderEventA(EventRouter.Event evt) {
-		Console.WriteLine("Received A event);
+		Console.WriteLine("Received SenderEvent.Test with id 'A'");
 	}
 
 	void OnSenderEventB(EventRouter.Event evt) {
-		Console.WriteLine("Received B event);
+		Console.WriteLine("Received SenderEvent.Test with id 'B'");
 	}
 }
 ```
